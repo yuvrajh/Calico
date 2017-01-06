@@ -1,0 +1,118 @@
+#####################
+
+kubectl annotate ns backend "net.beta.kubernetes.io/network-policy={\"ingress\":{\"isolation\":\"DefaultDeny\"}}"
+
+
+
+kubectl annotate ns prod "net.beta.kubernetes.io/network-isolation=yes" --overwrite=true  
+
+
+
+echo "backend 1" > /var/www/html/index.html
+
+
+
+
+calicoctl get profile k8s_ns.advanced-policy-demo -o yaml
+- apiVersion: v1
+  kind: profile
+  metadata:
+    name: k8s_ns.advanced-policy-demo
+    tags:
+    - k8s_ns.advanced-policy-demo
+  spec:
+    egress:
+    - action: allow
+      destination: {}
+      source: {}
+    ingress:
+    - action: deny
+      destination: {}
+      source: {}
+#####################
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: apache
+  labels:
+    name: apache
+spec:
+  containers:
+  - name: apache
+    image: centos/httpd
+    ports: 
+      - containerPort: 80
+======================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: apache2
+  labels:
+    name: apache2
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      nodePort: 30067
+
+  selector:
+    name: apache2
+
+=======================================
+
+kind: NetworkPolicy
+apiVersion: extensions/v1beta1
+metadata:
+  name: access-apache
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      name: apache
+  ingress:
+    - from:
+      - podSelector:
+          matchLabels:
+            run: access
+			
+			
+========================================
+
+apiVersion: extensions/v1beta1
+kind: NetworkPolicy
+metadata:
+ name: dev-prod
+ namespace: prod
+spec:
+ podSelector:
+  matchLabels:
+    name: apache1
+ ingress:
+  - from:
+     - namespaceSelector:
+        matchLabels:
+         project: dev
+     - podSelector:
+        matchLabels:
+         name: apache2
+===========================================
+
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: apache-deployment
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        name: apache
+    spec:
+      containers:
+      - name: my-apache
+        image: centos/httpd
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
